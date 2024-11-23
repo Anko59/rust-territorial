@@ -3,6 +3,7 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::sync::RwLock;
 use tokio::time::sleep;
+use log::info;
 
 #[derive(Default)]
 pub struct TimingStats {
@@ -23,18 +24,17 @@ impl TimingStats {
             .push(duration);
     }
 
-    pub fn get_and_clear_averages(&mut self) -> HashMap<String, f64> {
-        let mut averages = HashMap::new();
+    pub fn get_and_clear_totals(&mut self) -> HashMap<String, (f64, usize)> {
+        let mut totals = HashMap::new();
         
         for (name, times) in self.execution_times.drain() {
             if !times.is_empty() {
                 let total = times.iter().sum::<Duration>();
-                let avg = total.as_secs_f64() / times.len() as f64;
-                averages.insert(name, avg);
+                totals.insert(name, (total.as_secs_f64(), times.len()));
             }
         }
         
-        averages
+        totals
     }
 }
 
@@ -74,18 +74,22 @@ pub async fn start_timing_logger(stats: Arc<RwLock<TimingStats>>) {
         sleep(LOG_INTERVAL).await;
         
         let mut guard = stats.write().await;
-        let averages = guard.get_and_clear_averages();
+        let totals = guard.get_and_clear_totals();
         
-        if !averages.is_empty() {
-            println!("\n=== Performance Statistics (last 60s) ===");
-            // Sort by name for consistent output
-            let mut sorted_stats: Vec<_> = averages.into_iter().collect();
-            sorted_stats.sort_by(|a, b| a.0.cmp(&b.0));
+        if !totals.is_empty() {
+            info!("\n=== Performance Statistics (last 60s) ===");
+            // Sort by total execution time (descending)
+            let mut sorted_stats: Vec<_> = totals.into_iter().collect();
+            sorted_stats.sort_by(|a, b| b.1.0.partial_cmp(&a.1.0).unwrap());
             
-            for (name, avg) in sorted_stats {
-                println!("{:<30} {:.4} ms", name, avg * 1000.0);
+            for (name, (total_secs, count)) in sorted_stats {
+                info!("{:<30} Total: {:.4} ms, Count: {}", 
+                    name, 
+                    total_secs * 1000.0,
+                    count
+                );
             }
-            println!("=======================================\n");
+            info!("=======================================\n");
         }
     }
 }

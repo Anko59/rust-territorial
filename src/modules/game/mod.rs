@@ -1,6 +1,8 @@
 mod state;
-mod initialization;
 mod update;
-mod territory;
+mod initialization;
+pub mod grid;
+pub mod neighbors;
 
 pub use state::GameState;
+pub use initialization::initialize_game;

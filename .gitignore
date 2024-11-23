@@ -1,2 +1,3 @@
 /target
 /src/web/node_modules/*
+/src/map_files/*
